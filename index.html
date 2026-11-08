@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Steady Pulse</title>
+<meta name="description" content="Camera heart rate and heart-rhythm coherence trainer with a breathing pacer.">
+<meta name="theme-color" content="#ECF0F2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0D1418" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@500;600;700&family=Red+Hat+Mono:wght@400;500;600&family=Red+Hat+Text:wght@400;500;600&display=swap">
+<style>
+/* Layout: one instrument column — breathing dial on top, readings and ECG-paper charts beneath. */
+:root {
+  --bg: #ECF0F2;
+  --surface: #FFFFFF;
+  --ink: #13212A;
+  --muted: #5C6D77;
+  --line: #D4DDE2;
+  --accent: #17677F;
+  --accent-ink: #FFFFFF;
+  --breath: #D3E6EC;
+  --grid-minor: #F5DFE2;
+  --grid-major: #EBC3C9;
+  --band: rgba(23, 103, 127, 0.07);
+  --bar: #AEBCC4;
+  --low: #C2533B;
+  --medium: #3466AE;
+  --high: #2C8A57;
+  --low-soft: rgba(194, 83, 59, 0.10);
+  --medium-soft: rgba(52, 102, 174, 0.10);
+  --high-soft: rgba(44, 138, 87, 0.12);
+  --font-display: "Red Hat Display", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "Red Hat Text", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Red Hat Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D1418; --surface: #141E24; --ink: #E2EAED; --muted: #8C9EA8; --line: #25333B;
+    --accent: #5BB2CE; --accent-ink: #062029; --breath: #17303A;
+    --grid-minor: #2A1D21; --grid-major: #3F2A31; --band: rgba(91, 178, 206, 0.08); --bar: #3D4E57;
+    --low: #E27A60; --medium: #739EE3; --high: #5BC089;
+    --low-soft: rgba(226, 122, 96, 0.15); --medium-soft: rgba(115, 158, 227, 0.15); --high-soft: rgba(91, 192, 137, 0.15);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D1418; --surface: #141E24; --ink: #E2EAED; --muted: #8C9EA8; --line: #25333B;
+  --accent: #5BB2CE; --accent-ink: #062029; --breath: #17303A;
+  --grid-minor: #2A1D21; --grid-major: #3F2A31; --band: rgba(91, 178, 206, 0.08); --bar: #3D4E57;
+  --low: #E27A60; --medium: #739EE3; --high: #5BC089;
+  --low-soft: rgba(226, 122, 96, 0.15); --medium-soft: rgba(115, 158, 227, 0.15); --high-soft: rgba(91, 192, 137, 0.15);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 var(--font-body);
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.wrap {
+  max-width: 520px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+/* Header */
+.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.top .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding-block: 10px; }
+.brand { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 700; font-size: 18px; letter-spacing: -0.01em; white-space: nowrap; }
+@media (max-width: 439px) {
+  .top .wrap { padding-block: 8px; }
+  .tabs { width: 100%; }
+  .tabs button { flex: 1; }
+}
+.brand svg { width: 26px; height: 26px; flex: none; }
+.tabs { display: flex; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+.tabs button {
+  border: 0; background: transparent; border-radius: 999px; padding: 5px 11px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer;
+}
+.tabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); }
+
+main { padding-block: 14px 0; }
+section { display: grid; gap: 12px; }
+
+/* Status */
+.status-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: center; min-height: 28px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--line); font-size: 13px; font-weight: 500;
+}
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.chip[data-tone="good"] .dot { background: var(--high); }
+.chip[data-tone="warn"] .dot { background: var(--low); }
+.chip[data-tone="busy"] .dot { background: var(--medium); }
+.chip.quiet { color: var(--muted); }
+
+/* Breathing dial */
+.dial { position: relative; width: min(100%, 300px); aspect-ratio: 1; margin: 0 auto; max-width: 100%; }
+.dial svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.dial .breath { fill: var(--breath); }
+.dial .breath-edge { fill: none; stroke: var(--accent); stroke-width: 1.5; opacity: 0.55; }
+.dial .seg { fill: none; stroke: var(--line); stroke-width: 9; stroke-linecap: round; transition: stroke 300ms; }
+.dial .seg[data-zone="low"] { stroke: var(--low); }
+.dial .seg[data-zone="medium"] { stroke: var(--medium); }
+.dial .seg[data-zone="high"] { stroke: var(--high); }
+.dial .seg.latest { stroke-width: 12; }
+.dial-center { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 2px; pointer-events: none; }
+.score { font-family: var(--font-display); font-weight: 600; font-size: 68px; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.score.dim { color: var(--muted); }
+.zone-label { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.zone-label[data-zone="low"] { color: var(--low); }
+.zone-label[data-zone="medium"] { color: var(--medium); }
+.zone-label[data-zone="high"] { color: var(--high); }
+.dial-note { font-size: 12px; color: var(--muted); }
+
+.cue { text-align: center; display: grid; gap: 6px; justify-items: center; }
+.cue-text { font-family: var(--font-display); font-weight: 600; font-size: 20px; }
+.cue-text .num { font-size: 16px; color: var(--muted); margin-left: 6px; }
+.cue-bar { width: 180px; max-width: 70%; height: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.cue-bar span { display: block; height: 100%; width: 0; background: var(--accent); }
+
+/* Readings */
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.stat { padding: 10px 12px; display: grid; gap: 2px; }
+.stat + .stat { border-left: 1px solid var(--line); }
+.stat .value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 600; line-height: 1.2; }
+.stat .value small { font-size: 12px; font-weight: 500; color: var(--muted); margin-left: 3px; }
+
+.zonebar { display: grid; gap: 6px; }
+.zonebar .bar { display: flex; height: 8px; border-radius: 8px; overflow: hidden; background: var(--line); }
+.zonebar .bar span { display: block; height: 100%; transition: width 400ms; }
+.zonebar .bar .low { background: var(--low); }
+.zonebar .bar .medium { background: var(--medium); }
+.zonebar .bar .high { background: var(--high); }
+.zonebar .legend { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); }
+.zonebar .legend b { font-family: var(--font-mono); font-weight: 600; color: var(--ink); }
+.swatch { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: 0; }
+.swatch.low { background: var(--low); } .swatch.medium { background: var(--medium); } .swatch.high { background: var(--high); }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; min-width: 0; }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.card-head h2 { font-size: 15px; font-weight: 600; }
+.card-head .meta { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+canvas { display: block; width: 100%; }
+#rhythm { height: 132px; }
+#spectrum { height: 112px; }
+#pulse { height: 52px; flex: 1; min-width: 0; }
+.pulse-row { display: flex; align-items: center; gap: 12px; }
+#preview { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; background: var(--line); flex: none; }
+
+.guide ol { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.guide p { margin: 0; color: var(--muted); font-size: 13px; }
+
+.summary .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+.summary .grid div { display: grid; }
+.summary .grid .num { font-size: 20px; font-weight: 600; }
+#summary-chart { height: 110px; }
+
+.notice { padding: 10px 12px; border-radius: 10px; background: var(--low-soft); color: var(--ink); font-size: 14px; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: 12px; border: 1px solid var(--line); background: var(--surface);
+  padding: 10px 16px; font-weight: 600; cursor: pointer; min-height: 44px;
+}
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.danger { color: var(--low); border-color: var(--low); background: transparent; }
+.btn.small { min-height: 34px; padding: 5px 12px; font-size: 13px; border-radius: 9px; }
+.actions {
+  position: sticky; bottom: 0; z-index: 4;
+  padding-block: 12px max(12px, env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to bottom, transparent, var(--bg) 30%);
+}
+.actions .btn { width: 100%; font-size: 17px; min-height: 54px; border-radius: 14px; }
+.actions .btn.stop { background: var(--ink); border-color: var(--ink); color: var(--surface); }
+
+/* History */
+.kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; display: grid; gap: 2px; }
+.kpi .value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 600; }
+#trend { height: 120px; }
+.sessions { display: grid; gap: 8px; }
+.session { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; display: grid; gap: 8px; }
+.session-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.session-top .when { font-weight: 600; }
+.session-top .score-pill { font-family: var(--font-mono); font-weight: 600; padding: 1px 9px; border-radius: 999px; font-size: 14px; color: var(--accent-ink); }
+.score-pill[data-zone="low"] { background: var(--low); }
+.score-pill[data-zone="medium"] { background: var(--medium); }
+.score-pill[data-zone="high"] { background: var(--high); }
+.session-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); font-family: var(--font-mono); }
+.session .bar { display: flex; height: 6px; border-radius: 6px; overflow: hidden; background: var(--line); }
+.session .bar span { display: block; height: 100%; }
+.session .bar .low { background: var(--low); } .session .bar .medium { background: var(--medium); } .session .bar .high { background: var(--high); }
+.session-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; font-size: 13px; }
+.empty { text-align: center; color: var(--muted); padding: 24px 12px; }
+
+/* Settings */
+.setting { display: grid; gap: 6px; padding-block: 4px; }
+.setting + .setting { border-top: 1px solid var(--line); padding-top: 12px; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.setting-row label, .setting > label { font-weight: 600; }
+.hint { font-size: 13px; color: var(--muted); margin: 0; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+input[type="number"], select {
+  border: 1px solid var(--line); background: var(--bg); border-radius: 9px; padding: 7px 10px; min-height: 40px; max-width: 100%;
+}
+input[type="number"] { width: 90px; font-family: var(--font-mono); }
+.switch { position: relative; width: 46px; height: 28px; flex: none; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.switch span { position: absolute; inset: 0; border-radius: 999px; background: var(--line); transition: background 150ms; pointer-events: none; }
+.switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgba(0,0,0,0.25); transition: transform 150ms; }
+.switch input:checked + span { background: var(--accent); }
+.switch input:checked + span::after { transform: translateX(18px); }
+.switch input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cuts { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.cuts label { display: flex; align-items: center; gap: 8px; font-weight: 500; font-size: 14px; }
+.about p, .about li { font-size: 14px; }
+.about p { margin: 0; }
+.about ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; }
+.formula { font-family: var(--font-mono); font-size: 13px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; overflow-x: auto; white-space: nowrap; }
+.about a { color: var(--accent); }
+footer { padding-block: 18px 28px; font-size: 12px; color: var(--muted); text-align: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+@media (min-width: 560px) {
+  .score { font-size: 76px; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="var(--accent)"/><path d="M5 17h5l2.2-5 3.6 10 3-7.5 1.7 2.5H27" fill="none" stroke="var(--accent-ink)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Steady Pulse</span>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button type="button" role="tab" id="tab-practice" aria-selected="true" aria-controls="view-practice" data-view="practice">Practice</button>
+      <button type="button" role="tab" id="tab-history" aria-selected="false" aria-controls="view-history" data-view="history">History</button>
+      <button type="button" role="tab" id="tab-settings" aria-selected="false" aria-controls="view-settings" data-view="settings">Settings</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- Practice -->
+  <section id="view-practice" role="tabpanel" aria-labelledby="tab-practice">
+    <div class="status-row">
+      <span class="chip" id="status-chip" data-tone="idle" role="status" aria-live="polite"><span class="dot"></span><span id="status-text">Camera off</span></span>
+      <span class="chip quiet" id="flash-chip" hidden></span>
+    </div>
+
+    <div class="dial">
+      <svg viewBox="0 0 300 300" aria-hidden="true">
+        <circle class="breath" id="breath" cx="150" cy="150" r="90"/>
+        <circle class="breath-edge" id="breath-edge" cx="150" cy="150" r="90"/>
+        <g id="ring"></g>
+      </svg>
+      <div class="dial-center">
+        <div class="score dim num" id="score">–</div>
+        <div class="zone-label" id="zone-label">Coherence</div>
+        <div class="dial-note" id="dial-note">ring = last minute</div>
+      </div>
+    </div>
+
+    <div class="cue" id="cue">
+      <div class="cue-text" id="cue-text">Breathe in<span class="num" id="cue-count"></span></div>
+      <div class="cue-bar" aria-hidden="true"><span id="cue-bar"></span></div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><span class="label">Heart rate</span><span class="value" id="hr">–<small>bpm</small></span></div>
+      <div class="stat"><span class="label">Time</span><span class="value" id="elapsed">0:00</span></div>
+      <div class="stat"><span class="label">Points</span><span class="value" id="points">0</span></div>
+    </div>
+
+    <div class="zonebar" aria-label="Time in each coherence zone this session">
+      <div class="bar"><span class="low" id="zb-low" style="width:0"></span><span class="medium" id="zb-medium" style="width:0"></span><span class="high" id="zb-high" style="width:0"></span></div>
+      <div class="legend">
+        <span><i class="swatch low"></i>Low <b id="zl-low">0%</b></span>
+        <span><i class="swatch medium"></i>Medium <b id="zl-medium">0%</b></span>
+        <span><i class="swatch high"></i>High <b id="zl-high">0%</b></span>
+      </div>
+    </div>
+
+    <div class="card guide" id="guide">
+      <div class="card-head"><h2>How to measure</h2></div>
+      <ol>
+        <li>Tap <b>Start session</b> and allow the camera.</li>
+        <li>Rest your fingertip over the rear camera and flash. Cover both, press lightly.</li>
+        <li>Keep your hand still and breathe with the circle.</li>
+      </ol>
+      <p>The first score appears after about 30 seconds and updates every 5 seconds.</p>
+    </div>
+
+    <div class="card summary" id="summary" hidden>
+      <div class="card-head"><h2 id="summary-title">Session saved</h2><span class="meta" id="summary-when"></span></div>
+      <div class="grid">
+        <div><span class="label">Average coherence</span><span class="num" id="sum-score">–</span></div>
+        <div><span class="label">Duration</span><span class="num" id="sum-duration">–</span></div>
+        <div><span class="label">Average heart rate</span><span class="num" id="sum-hr">–</span></div>
+        <div><span class="label">Points</span><span class="num" id="sum-points">–</span></div>
+      </div>
+      <canvas id="summary-chart" aria-label="Coherence score over the session"></canvas>
+      <p class="hint" id="summary-zones"></p>
+    </div>
+
+    <div class="notice" id="notice" hidden></div>
+
+    <div class="card">
+      <div class="card-head"><h2>Heart rhythm</h2><span class="meta">beat-to-beat · bpm</span></div>
+      <canvas id="rhythm" aria-label="Beat-to-beat heart rate over the last 64 seconds"></canvas>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Spectrum</h2><span class="meta" id="spectrum-meta">0–0.4 Hz</span></div>
+      <canvas id="spectrum" aria-label="Heart rhythm power spectrum with the coherence peak highlighted"></canvas>
+      <p class="hint" id="spectrum-note">Shaded: where the coherence peak is searched (0.04–0.26 Hz). Coloured bars: the peak the score is built on.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Pulse</h2><span class="meta" id="pulse-meta">camera signal</span></div>
+      <div class="pulse-row">
+        <video id="preview" muted playsinline aria-label="Camera preview"></video>
+        <canvas id="pulse" aria-label="Live pulse waveform"></canvas>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="btn primary" id="start-btn">Start session</button>
+    </div>
+  </section>
+
+  <!-- History -->
+  <section id="view-history" role="tabpanel" aria-labelledby="tab-history" hidden>
+    <div class="kpis">
+      <div class="kpi"><span class="label">Sessions</span><span class="value" id="k-sessions">0</span></div>
+      <div class="kpi"><span class="label">Practice time</span><span class="value" id="k-time">0 min</span></div>
+      <div class="kpi"><span class="label">7-day average</span><span class="value" id="k-avg7">–</span></div>
+      <div class="kpi"><span class="label">Best session</span><span class="value" id="k-best">–</span></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Coherence by session</h2><span class="meta">average score</span></div>
+      <canvas id="trend" aria-label="Average coherence score per session"></canvas>
+    </div>
+    <div class="sessions" id="sessions"></div>
+  </section>
+
+  <!-- Settings -->
+  <section id="view-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
+    <div class="card">
+      <div class="setting">
+        <div class="setting-row"><label for="set-pacer">Breathing pacer</label><span class="switch"><input type="checkbox" id="set-pacer"><span></span></span></div>
+        <input type="range" id="set-rate" min="4" max="10" step="0.5" aria-label="Breaths per minute">
+        <p class="hint" id="rate-hint"></p>
+      </div>
+      <div class="setting">
+        <label>Coherence zones</label>
+        <div class="cuts">
+          <label for="set-cut1">Medium from <input type="number" id="set-cut1" min="0.1" max="10" step="0.1" inputmode="decimal"></label>
+          <label for="set-cut2">High from <input type="number" id="set-cut2" min="0.2" max="15" step="0.1" inputmode="decimal"></label>
+        </div>
+        <p class="hint" id="cuts-hint">Defaults 1.0 and 3.0, based on HeartMath’s published guide (1 = good, 3+ = excellent).</p>
+        <div><button type="button" class="btn small" id="cuts-reset">Reset to 1.0 / 3.0</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="setting">
+        <div class="setting-row"><label for="set-torch">Use the flash</label><span class="switch"><input type="checkbox" id="set-torch"><span></span></span></div>
+        <p class="hint">Lights your fingertip from behind. Recommended.</p>
+      </div>
+      <div class="setting">
+        <label for="set-camera">Camera</label>
+        <select id="set-camera"><option value="">Automatic (rear camera with flash)</option></select>
+        <p class="hint">Other cameras appear here after the first session.</p>
+      </div>
+      <div class="setting">
+        <div class="setting-row"><label for="set-wake">Keep screen on during sessions</label><span class="switch"><input type="checkbox" id="set-wake"><span></span></span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="setting">
+        <label>Session history</label>
+        <p class="hint">Sessions are stored only in this browser on this device.</p>
+        <div id="wipe-area"><button type="button" class="btn small danger" id="wipe-btn">Delete all sessions</button></div>
+      </div>
+    </div>
+
+    <div class="card about">
+      <div class="card-head"><h2>How the score is calculated</h2></div>
+      <p>Every 5 seconds the app takes the last 64 seconds of beat-to-beat intervals, resamples them evenly at 2 Hz, removes the linear trend and computes the power spectrum. It finds the highest spectral peak between 0.04 and 0.26 Hz and sums the power in a ~0.03 Hz window around it.</p>
+      <div class="formula">ratio = (peak ÷ below) × (peak ÷ above)<br>score = ln(ratio + 1), shown 0–16</div>
+      <p>“Below” and “above” are the power on either side of the peak window, from 0 to 0.4 Hz. A smooth, wave-like heart rhythm puts most of its power into one peak, usually near 0.1 Hz (6 breaths per minute), and scores high. Points add up the 5-second scores over a session.</p>
+      <ul>
+        <li>Method published by HeartMath: <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC9214473/" target="_blank" rel="noopener">McCraty (2022)</a>, <a href="https://heartcloud.com/library/coherence_over_time.html" target="_blank" rel="noopener">HeartCloud help</a>, and Balaji et al., <i>Scientific Reports</i> (2025).</li>
+        <li>HeartMath’s exact code is proprietary, so scores follow theirs in direction and scale but will not match exactly.</li>
+        <li>Camera readings need a still hand. Movement and pressure changes are detected and skipped; if too much is skipped, no score is shown.</li>
+      </ul>
+      <p class="hint">Steady Pulse is a relaxation and biofeedback tool, not a medical device. It does not diagnose, treat or monitor any condition. HeartMath is a trademark of its owner; this app is not affiliated with it.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="wrap">Steady Pulse · all processing happens on your device · your measurements are never uploaded</footer>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

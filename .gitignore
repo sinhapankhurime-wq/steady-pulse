@@ -1,0 +1,4 @@
+node_modules/
+*.y4m
+*.y4m.truth.json
+test-output/

@@ -1,0 +1,17 @@
+{
+  "name": "Steady Pulse",
+  "short_name": "Steady Pulse",
+  "description": "Camera heart rate and heart-rhythm coherence trainer with a breathing pacer.",
+  "start_url": "./#practice",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ECF0F2",
+  "theme_color": "#17677F",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

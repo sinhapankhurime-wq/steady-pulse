@@ -1,0 +1,11 @@
+{
+  "name": "steady-pulse",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Camera-based heart rate and heart-rhythm coherence trainer (static web app).",
+  "type": "module",
+  "scripts": {
+    "test": "node test/coherence.test.js && node test/ppg.test.js",
+    "e2e": "node test/e2e.js"
+  }
+}
