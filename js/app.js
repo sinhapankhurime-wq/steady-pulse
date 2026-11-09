@@ -3,14 +3,18 @@ import { computeCoherence, zoneFor, COHERENCE } from './coherence.js';
 import { PulseDetector } from './ppg.js';
 import { FingerCamera, listCameras } from './camera.js';
 import { drawRhythm, drawSpectrum, drawPulse, drawScoreTimeline, drawTrend } from './charts.js';
+import { createDiagnostics } from './diagnostics.js';
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const STORE_KEY = 'steadyPulse.v1';
-const DEFAULTS = Object.freeze({ pacerOn: true, pacerBpm: 6, cuts: [1, 3], torch: true, cameraId: '', wakeLock: true });
+const DEFAULTS = Object.freeze({ pacerOn: true, pacerBpm: 6, cuts: [1, 3], torch: true, cameraId: '', wakeLock: true, diagnostics: false });
 const ZONE_NAME = { low: 'Low', medium: 'Medium', high: 'High' };
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 const forcedSampler = ['processor', 'rvfc', 'raf'].includes(params.get('sampler')) ? params.get('sampler') : null;
+const forceDiagnostics = params.get('debug') === '1';
+const RECORD_SEC = 60;   // length of a saved troubleshooting recording
+const RAW_KEEP_SEC = 70; // raw camera samples kept in memory for it
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
 // ---------------------------------------------------------------- storage
@@ -20,7 +24,7 @@ function sanitizeSettings(s) {
   out.pacerBpm = Math.min(10, Math.max(4, Number(out.pacerBpm) || DEFAULTS.pacerBpm));
   const c = Array.isArray(out.cuts) ? out.cuts.map(Number) : [];
   out.cuts = c.length === 2 && c[0] > 0 && c[1] > c[0] ? c : [...DEFAULTS.cuts];
-  out.pacerOn = !!out.pacerOn; out.torch = !!out.torch; out.wakeLock = !!out.wakeLock;
+  out.pacerOn = !!out.pacerOn; out.torch = !!out.torch; out.wakeLock = !!out.wakeLock; out.diagnostics = !!out.diagnostics;
   out.cameraId = typeof out.cameraId === 'string' ? out.cameraId : '';
   return out;
 }
@@ -58,8 +62,11 @@ const live = {
   status: 'off',
   wakeLock: null,
   lastFrameT: null,
+  raw: [],           // recent raw camera samples [t, r, g, b] for diagnostics
+  lastRgb: null,
 };
 window.__steadyPulse = { live, store, VERSION }; // for debugging and automated tests
+let diag = null; // diagnostics panel, created at boot
 
 // ---------------------------------------------------------------- breathing dial
 const R_MIN = 66, R_MAX = 112, RING_R = 136;
@@ -112,6 +119,7 @@ function frameLoop(now) {
     lastPulseDraw = now;
     drawPulse($('pulse'), live.detector.trace, live.detector.marks);
   }
+  if (currentView === 'practice') diag?.render(now);
   requestAnimationFrame(frameLoop);
 }
 
@@ -156,6 +164,8 @@ async function startSession(sampler = forcedSampler) {
   };
   live.result = null;
   live.lastFrameT = null;
+  live.raw = [];
+  live.lastRgb = null;
   $('hr').innerHTML = '–<small>bpm</small>';
   $('elapsed').textContent = '0:00';
   live.detector = new PulseDetector({ onBeat, onStatus: s => { if (live.running) setStatus(s); } });
@@ -196,6 +206,12 @@ function onFrame(t, r, g, b) {
   const s = live.session;
   if (!s || !live.detector) return;
   live.lastFrameT = t;
+  live.lastRgb = [r, g, b];
+  live.raw.push([t, r, g, b]);
+  if (live.raw.length > 64 && t - live.raw[0][0] > RAW_KEEP_SEC * 1000 + 5000) {
+    const cut = live.raw.findIndex(f => f[0] >= t - RAW_KEEP_SEC * 1000);
+    live.raw.splice(0, Math.max(0, cut));
+  }
   live.detector.pushFrame(t, r, g, b);
   if (s.t0 == null && live.detector.finger) {
     s.t0 = t;
@@ -213,7 +229,7 @@ function onFrame(t, r, g, b) {
 function onBeat(b) {
   const s = live.session;
   if (!s || s.t0 == null) return;
-  s.beats.push({ t: (b.t - s.t0) / 1000, ibi: b.ibi, valid: b.valid });
+  s.beats.push({ t: (b.t - s.t0) / 1000, ibi: b.ibi, valid: b.valid, reason: b.reason });
   renderHr();
   if (currentView === 'practice') drawRhythmNow();
 }
@@ -228,7 +244,7 @@ function scoreTick(tMs) {
     s.points += res.score;
     live.result = res;
   } else {
-    s.scores.push({ t: tEnd, score: null, reason: res.reason });
+    s.scores.push({ t: tEnd, score: null, reason: res.reason, coverage: res.coverage ?? null });
   }
   renderScore();
   renderStats();
@@ -570,6 +586,12 @@ function initSettings() {
     }
   });
   $('set-camera').addEventListener('change', e => { st.cameraId = e.target.value; persist(); });
+  $('set-diag').checked = st.diagnostics || forceDiagnostics;
+  $('set-diag').addEventListener('change', e => {
+    st.diagnostics = e.target.checked;
+    persist();
+    diag?.setVisible(st.diagnostics);
+  });
   $('set-wake').addEventListener('change', e => {
     st.wakeLock = e.target.checked;
     persist();
@@ -634,6 +656,11 @@ function redraw() {
 // ---------------------------------------------------------------- boot
 function boot() {
   buildRing();
+  diag = createDiagnostics({
+    live, store, version: VERSION, recordSec: RECORD_SEC,
+    el: { panel: $('diag'), list: $('diag-list'), copy: $('diag-copy'), save: $('diag-save'), share: $('diag-share'), note: $('diag-note'), fallback: $('diag-fallback') },
+  });
+  diag.setVisible(store.settings.diagnostics || forceDiagnostics);
   initSettings();
   for (const b of document.querySelectorAll('.tabs button')) b.addEventListener('click', () => showView(b.dataset.view));
   window.addEventListener('hashchange', () => showView(location.hash.slice(1)));

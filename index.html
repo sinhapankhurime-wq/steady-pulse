@@ -180,6 +180,12 @@ canvas { display: block; width: 100%; }
 
 .notice { padding: 10px 12px; border-radius: 10px; background: var(--low-soft); color: var(--ink); font-size: 14px; }
 
+.diag-list { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 5px 12px; margin: 0; font-size: 13px; }
+.diag-list dt { color: var(--muted); }
+.diag-list dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-width: 0; }
+.diag-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.diag-fallback { width: 100%; font: 12px/1.4 var(--font-mono); background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 9px; padding: 8px; }
+
 /* Buttons */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -351,6 +357,18 @@ footer { padding-block: 18px 28px; font-size: 12px; color: var(--muted); text-al
       </div>
     </div>
 
+    <div class="card diag" id="diag" hidden>
+      <div class="card-head"><h2>Diagnostics</h2><span class="meta">for troubleshooting</span></div>
+      <dl class="diag-list" id="diag-list"></dl>
+      <div class="diag-actions">
+        <button type="button" class="btn small" id="diag-copy">Copy summary</button>
+        <button type="button" class="btn small" id="diag-save">Save recording</button>
+        <button type="button" class="btn small" id="diag-share" hidden>Share recording</button>
+      </div>
+      <textarea id="diag-fallback" class="diag-fallback" rows="6" readonly hidden aria-label="Diagnostics summary"></textarea>
+      <p class="hint" id="diag-note">A recording holds the last 60 seconds of camera brightness values and the beats found. It stays on your phone unless you share it.</p>
+    </div>
+
     <div class="actions">
       <button type="button" class="btn primary" id="start-btn">Start session</button>
     </div>
@@ -402,6 +420,10 @@ footer { padding-block: 18px 28px; font-size: 12px; color: var(--muted); text-al
       </div>
       <div class="setting">
         <div class="setting-row"><label for="set-wake">Keep screen on during sessions</label><span class="switch"><input type="checkbox" id="set-wake"><span></span></span></div>
+      </div>
+      <div class="setting">
+        <div class="setting-row"><label for="set-diag">Show diagnostics</label><span class="switch"><input type="checkbox" id="set-diag"><span></span></span></div>
+        <p class="hint">Adds a panel to the Practice screen with camera and signal details, plus a button to save a recording for troubleshooting.</p>
       </div>
     </div>
 

@@ -109,6 +109,24 @@ export class FingerCamera {
     };
   }
 
+  /** Camera details for the diagnostics panel (no identifiers). */
+  describe() {
+    if (!this.track) return null;
+    let s = {};
+    try { s = this.track.getSettings?.() ?? {}; } catch { /* ignore */ }
+    const v = this.video;
+    return {
+      label: this.track.label,
+      width: s.width ?? v.videoWidth ?? null,
+      height: s.height ?? v.videoHeight ?? null,
+      frameRate: s.frameRate ?? null,
+      facingMode: s.facingMode ?? null,
+      torch: this.torch,
+      torchAvailable: hasTorch(this.track),
+      sampler: this.mode,
+    };
+  }
+
   async setTorch(on) {
     if (!this.track || !hasTorch(this.track)) return false;
     try {

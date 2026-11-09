@@ -47,6 +47,22 @@ No build step is needed.
 
 Cut-offs can be changed in **Settings**.
 
+## Troubleshooting camera readings
+
+Turn on **Settings → Show diagnostics**. A panel then appears on the Practice screen,
+showing frame rate, flash, colour levels, pulse size, why beats were rejected, and why
+there is no score.
+
+- **Copy summary** copies those numbers as text.
+- **Save recording** saves the last 60 seconds of raw camera brightness values and the
+  detected beats as a small `.txt` file. **Share recording** sends the same file on
+  phones that support it.
+- The recording can be replayed offline with `node test/replay.js <file>` to see exactly
+  why beats are rejected, and to test detector changes on a real signal.
+
+To check heart-rate accuracy, wear a watch or fitness band that shows live heart rate
+(for example, start a workout on it). Compare its reading with Steady Pulse at the same moment.
+
 ## How the score is calculated
 
 Every 5 seconds, using the last 64 seconds of clean beat-to-beat intervals:
@@ -125,8 +141,9 @@ fingers and lighting vary.
 | `js/ppg.js` | Camera beat detector (pure, testable) |
 | `js/camera.js` | Camera, flash and frame sampling |
 | `js/charts.js` | Canvas charts |
+| `js/diagnostics.js` | Diagnostics panel and troubleshooting recording |
 | `manifest.webmanifest`, `icon*` | Home-screen install |
-| `test/` | Unit tests, synthetic signal generator, end-to-end test |
+| `test/` | Unit tests, synthetic signal generator, end-to-end test, recording replay |
 
 ## Key risks & caveats
 
